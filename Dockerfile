@@ -8,7 +8,7 @@ FROM ubuntu:jammy
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG DEBIAN_FRONTEND=noninteractive
 
-# Install up-to-date node & npm, deps for virtual screen & noVNC, firefox, pip for apprise.
+# Install up-to-date node & npm, deps for virtual screen & noVNC, chromium, pip for apprise.
 RUN apt-get update \
     && apt-get install --no-install-recommends -y curl ca-certificates gnupg \
     && mkdir -p /etc/apt/keyrings \
@@ -23,7 +23,6 @@ RUN apt-get update \
       novnc websockify \
       dos2unix \
       python3-pip \
-    # && npx playwright install-deps firefox \
     && apt-get install --no-install-recommends -y \
       libgtk-3-0 \
       libasound2 \
@@ -54,16 +53,15 @@ RUN pip install apprise
 WORKDIR /fgc
 COPY package*.json ./
 
-# Playwright installs patched firefox to ~/.cache/ms-playwright/firefox-*
-# Requires some system deps to run (see inlined install-deps above).
+# Playwright installs patched chromium to ~/.cache/ms-playwright/chromium-*
+# Requires some system deps to run.
 RUN npm install
-# Old: PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD + install firefox (had to be done after `npm install` to get the correct version). Now: playwright-firefox as npm dep and `npm install` will only install that.
-# From 1.38 Playwright will no longer install browser automatically for playwright, but apparently still for playwright-firefox: https://github.com/microsoft/playwright/releases/tag/v1.38.0
-# RUN npx playwright install firefox
+# Now: playwright-chromium as npm dep and `npm install` will only install that.
+RUN npx playwright install chromium
 
 COPY . .
 
-# Shell scripts need Linux line endings. On Windows, git might be configured to check out dos/CRLF line endings, so we convert them for those people in case they want to build the image. They could also use --config core.autocrlf=input
+# Shell scripts need Linux line endings. On Windows, git might be configured to check out dos/CRLF line endings, so we convert them for those people in case they want to build the image. They could al[...]
 RUN dos2unix ./*.sh && chmod +x ./*.sh
 COPY docker-entrypoint.sh /usr/local/bin/
 
