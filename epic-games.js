@@ -1,4 +1,4 @@
-import { firefox } from 'playwright-firefox'; // stealth plugin needs no outdated playwright-extra
+import { chromium } from 'playwright'; // Update to use `playwright` for Chromium
 import { authenticator } from 'otplib';
 import path from 'path';
 import { existsSync, writeFileSync, appendFileSync } from 'fs';
@@ -19,28 +19,25 @@ if (cfg.time) console.time('startup');
 const browserPrefs = path.join(cfg.dir.browser, 'prefs.js');
 if (existsSync(browserPrefs)) {
   console.log('Adding webgl.disabled to', browserPrefs);
-  appendFileSync(browserPrefs, 'user_pref("webgl.disabled", true);'); // apparently Firefox removes duplicates (and sorts), so no problem appending every time
+  appendFileSync(browserPrefs, 'user_pref("webgl.disabled", true);');
 } else {
   console.log(browserPrefs, 'does not exist yet, will patch it on next run. Restart the script if you get a captcha.');
 }
 
-// https://playwright.dev/docs/auth#multi-factor-authentication
-const context = await firefox.launchPersistentContext(cfg.dir.browser, {
+// Update to use Chromium
+const context = await chromium.launchPersistentContext(cfg.dir.browser, {
   headless: cfg.headless,
   viewport: { width: cfg.width, height: cfg.height },
-  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14.7; rv:133.0) Gecko/20100101 Firefox/133.0', // see replace of Headless in util.newStealthContext. TODO Windows UA enough to avoid 'device not supported'? update if browser is updated?
-  // userAgent firefox (macOS): Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:106.0) Gecko/20100101 Firefox/106.0
-  // userAgent firefox (docker): Mozilla/5.0 (X11; Linux aarch64; rv:109.0) Gecko/20100101 Firefox/115.0
-  locale: 'en-US', // ignore OS locale to be sure to have english text for locators
-  recordVideo: cfg.record ? { dir: 'data/record/', size: { width: cfg.width, height: cfg.height } } : undefined, // will record a .webm video for each page navigated; without size, video would be scaled down to fit 800x800
-  recordHar: cfg.record ? { path: `data/record/eg-${filenamify(datetime())}.har` } : undefined, // will record a HAR file with network requests and responses; can be imported in Chrome devtools
-  handleSIGINT: false, // have to handle ourselves and call context.close(), otherwise recordings from above won't be saved
-  // user settings for firefox have to be put in $BROWSER_DIR/user.js
-  args: [ // https://wiki.mozilla.org/Firefox/CommandLineOptions
-    // '-kiosk',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+  locale: 'en-US',
+  recordVideo: cfg.record ? { dir: 'data/record/', size: { width: cfg.width, height: cfg.height } } : undefined,
+  recordHar: cfg.record ? { path: `data/record/eg-${filenamify(datetime())}.har` } : undefined,
+  handleSIGINT: false,
+  args: [
+    // Add any Chromium-specific arguments here if needed
   ],
   proxy: {
-    server: 'http://129.148.24.141:20814', // Change to HTTP or HTTPS proxy
+    server: 'http://129.148.24.141:20814',
     username: 'cym31152',
     password: 'cccc1111'
   }
@@ -48,24 +45,19 @@ const context = await firefox.launchPersistentContext(cfg.dir.browser, {
 
 handleSIGINT(context);
 
-// Without stealth plugin, the website shows an hcaptcha on login with username/password and in the last step of claiming a game. It may have other heuristics like unsuccessful logins as well. After <6h (TBD) it resets to no captcha again. Getting a new IP also resets.
 await stealth(context);
 
 if (!cfg.debug) context.setDefaultTimeout(cfg.timeout);
 
-const page = context.pages().length ? context.pages()[0] : await context.newPage(); // should always exist
-await page.setViewportSize({ width: cfg.width, height: cfg.height }); // TODO workaround for https://github.com/vogler/free-games-claimer/issues/277 until Playwright fixes it
+const page = context.pages().length ? context.pages()[0] : await context.newPage();
+await page.setViewportSize({ width: cfg.width, height: cfg.height });
 
-// some debug info about the page (screen dimensions, user agent, platform)
-// eslint-disable-next-line no-undef
-if (cfg.debug) console.debug(await page.evaluate(() => [(({ width, height, availWidth, availHeight }) => ({ width, height, availWidth, availHeight }))(window.screen), navigator.userAgent, navigator.platform, navigator.vendor])); // deconstruct screen needed since `window.screen` prints {}, `window.screen.toString()` '[object Screen]', and can't use some pick function without defining it on `page`
+if (cfg.debug) console.debug(await page.evaluate(() => [(({ width, height, availWidth, availHeight }) => ({ width, height, availWidth, availHeight }))(window.screen), navigator.userAgent, navigator.platform]));
 if (cfg.debug_network) {
-  // const filter = _ => true;
   const filter = r => r.url().includes('store.epicgames.com');
   page.on('request', request => filter(request) && console.log('>>', request.method(), request.url()));
   page.on('response', response => filter(response) && console.log('<<', response.status(), response.url()));
 }
-
 const notify_games = [];
 let user;
 
