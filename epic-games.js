@@ -1,4 +1,4 @@
-import { chromium } from 'playwright'; // Update to use `playwright` for Chromium
+import { chromium } from 'playwright';
 import { authenticator } from 'otplib';
 import path from 'path';
 import { existsSync, writeFileSync, appendFileSync } from 'fs';
@@ -24,7 +24,6 @@ if (existsSync(browserPrefs)) {
   console.log(browserPrefs, 'does not exist yet, will patch it on next run. Restart the script if you get a captcha.');
 }
 
-// Update to use Chromium
 const context = await chromium.launchPersistentContext(cfg.dir.browser, {
   headless: cfg.headless,
   viewport: { width: cfg.width, height: cfg.height },
@@ -34,10 +33,12 @@ const context = await chromium.launchPersistentContext(cfg.dir.browser, {
   recordHar: cfg.record ? { path: `data/record/eg-${filenamify(datetime())}.har` } : undefined,
   handleSIGINT: false,
   args: [
-    // Add any Chromium-specific arguments here if needed
+    '--enable-ipv6',
+    '--disable-ipv4',
+    '--force-ipv6'
   ],
   proxy: {
-    server: 'http://129.148.24.141:20814',
+    server: 'http://[IPv6 address]:port', // Replace with actual IPv6 address and port
     username: 'cym31152',
     password: 'cccc1111'
   }
